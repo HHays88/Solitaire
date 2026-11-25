@@ -2,6 +2,8 @@ package com.hays.solitaire.model;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.Set;
 
 public class GameState {
 
@@ -29,23 +31,58 @@ public class GameState {
     private int remainingUndos;
     private boolean gameWon;
 
+    // Private helper method to validate the deck isn't corrupted
+    private static void validateOriginalDeck(
+            ArrayList<Card> deck) {
+        if (deck == null || deck.size() != Deck.DECK_SIZE) {
+            throw new IllegalArgumentException(
+                    "Original deck must contain 52 cards."
+            );
+        }
+        Set<String> uniqueCards = new HashSet<>();
+        for (Card card : deck) {
+            if (card == null
+                    || card.getSuit() == null
+                    || card.getRank() == null) {
+                throw new IllegalArgumentException(
+                        "Original deck contains an invalid card."
+                );
+            }
+            String cardID = card.getSuit().name()
+                    + ":" + card.getRank().name();
+            if (!uniqueCards.add(cardID)) {
+                throw new IllegalArgumentException(
+                        "Original deck contains duplicate cards."
+                );
+            }
+            if (card.isFaceUp()) {
+                throw new IllegalArgumentException(
+                        "Original deck cards must be face down."
+                );
+            }
+        }
+    }
+
     // create initial game state with deck, stock, discard, foundations,
     // tableau columns, and map suits to foundation piles
-    public GameState(){
-        originalDeck = new ArrayList<>(Deck.DECK_SIZE);
+    public GameState() {
+        this(Deck.createShuffledDeck());
+    }
+    public GameState(ArrayList<Card> originalDeck) {
+        validateOriginalDeck(originalDeck);
+        this.originalDeck = new ArrayList<>(Deck.DECK_SIZE);
         stock = new ArrayList<>(Deck.DECK_SIZE);
         discard = new ArrayList<>(Deck.DECK_SIZE);
-
         foundations = new EnumMap<>(Card.Suit.class);
         tableau = new ArrayList<>(TABLEAU_COLUMNS);
-
         for (Card.Suit suit : Card.Suit.values()) {
             foundations.put(suit, new ArrayList<>(13));
         }
         for (int i = 0; i < TABLEAU_COLUMNS; i++) {
             tableau.add(new ArrayList<>());
         }
-        newGame();
+        this.originalDeck.addAll(copyCards(originalDeck));
+        restart();
     }
 
     // newGame() is an extension of restart() to replace the deck

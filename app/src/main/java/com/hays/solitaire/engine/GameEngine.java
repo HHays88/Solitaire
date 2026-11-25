@@ -36,8 +36,16 @@ public final class GameEngine {
     public int getUndoHistorySize() {
         return undoManager.getHistorySize();
     }
+    // Export undo history for persistent storage
+    public ArrayList<UndoManager.UndoEntry> exportUndoHistory() {
+        return undoManager.exportHistory();
+    }
+    // Restore previously saved undo history
+    public void importUndoHistory(
+            ArrayList<UndoManager.UndoEntry> entries) {
+        undoManager.importHistory(entries);
+    }
     private final UndoManager undoManager;
-
     public GameEngine(GameState state) {
         this.state = state;
         this.undoManager = new UndoManager(state);

@@ -3,34 +3,47 @@ package com.hays.solitaire.engine;
 import com.hays.solitaire.model.GameState;
 import com.hays.solitaire.model.GameSnapshot;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 
 // Receives reference to existing GameState object
 public final class UndoManager {
     private final GameState state;
     private final ArrayDeque<UndoEntry> history;
+
+    //Constructor
     public UndoManager(GameState state) {
         this.state = state;
         history = new ArrayDeque<>(GameState.MAX_UNDOS);
     }
 
-    // UNDO HISTORY ENTRY
-    // Nesting this class because it supports UndoManager
-    private static final class UndoEntry {
+    // UNDO ENTRY
+    // Stores independent snapshots and reversible score adjustments
+    // associated with actions
+    public static final class UndoEntry {
         private final GameSnapshot snapshot;
-        // GameSnapshot stores the score at capture but that could restore
-        // previous undo or recycle penalties, so this stores reversible
-        // adjustments associated with Undo and Recycle. However, undoing
-        // a recycle does not undo the penalty. I might fix this later.
+        // Undoing a recycle does not undo the penalty.
+        // I might fix this later.
         private final int reversibleScoreChange;
-        private UndoEntry(
+        public UndoEntry(
                 GameSnapshot snapshot,
                 int reversibleScoreChange) {
+            if (snapshot == null) {
+                throw new IllegalArgumentException(
+                        "Undo snapshot cannot be null."
+                );
+            }
             this.snapshot = snapshot;
             this.reversibleScoreChange = reversibleScoreChange;
         }
+        public GameSnapshot getSnapshot() {
+            return snapshot;
+        }
+        public int getReversibleScoreChange() {
+            return reversibleScoreChange;
+        }
     }
 
-    // RECORD GAMEPLAY ACTION
+    // RECORD GAMEPLAY ACTIONS
     // Checks if any undos remain; if not it does not record history,
     // otherwise UndoEntry is created and pushed to the stack. This
     // method only stores a number of snapshots equal to the number
@@ -52,7 +65,7 @@ public final class UndoManager {
         }
     }
 
-    // UNDO VALIDATION
+    // UNDO OPERATIONS
     public boolean canUndo() {
         return !state.isGameWon()
                 && state.getRemainingUndos() > 0
@@ -86,15 +99,53 @@ public final class UndoManager {
         return true;
     }
 
-    // CLEAR UNDO HISTORY
-    // Only called when the game is restarted or a new game is dealt.
+    // HISTORY MANAGEMENT
     public void clearHistory() {
         history.clear();
     }
 
-    // GETTER
-    // Inspect number of recorded actions without exposing the collection
     public int getHistorySize() {
         return history.size();
+    }
+
+    // PERSISTENT STORAGE
+
+    // Export newest-to-oldest without exposing ArrayDeque so exported
+    // list can be modified without affecting internal history and we
+    // don't need more deep copies in every exported snapshot
+    public ArrayList<UndoEntry> exportHistory() {
+        return new ArrayList<>(history);
+    }
+
+    // Reconstruct history from saved entries maintaining
+    // newest-to-oldest order.
+    public void importHistory(
+            ArrayList<UndoEntry> entries) {
+        if (entries == null) {
+            throw new IllegalArgumentException(
+                    "Undo history cannot be null."
+            );
+        }
+        if (entries.size() > GameState.MAX_UNDOS) {
+            throw new IllegalArgumentException(
+                    "Undo history exceeds maximum allowed undos."
+            );
+        }
+        if (entries.size() > state.getRemainingUndos()) {
+            throw new IllegalArgumentException(
+                    "Undo history exceeds remaining undos."
+            );
+        }
+        for (UndoEntry entry : entries) {
+            if (entry == null) {
+                throw new IllegalArgumentException(
+                        "Undo history contains a null entry."
+                );
+            }
+        }
+
+        // Replace existing history only after validation succeeds.
+        history.clear();
+        history.addAll(entries);
     }
 }

@@ -3,12 +3,9 @@ package com.hays.solitaire.engine;
 import com.hays.solitaire.model.Card;
 import com.hays.solitaire.model.GameState;
 import com.hays.solitaire.model.GameSnapshot;
-
+import java.util.ArrayList;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.ArrayList;
-
 import static org.junit.Assert.*;
 
 public class UndoManagerTest {
@@ -634,6 +631,473 @@ public class UndoManagerTest {
         assertTrue(undoManager.undo());
 
         assertEquals(15000L, state.getElapsedTimeMs());
+    }
+
+    // HISTORY EXPORT TESTS
+
+    @Test
+    public void exportHistoryReturnsEmptyListInitially() {
+        assertTrue(undoManager.exportHistory().isEmpty());
+    }
+
+    @Test
+    public void exportHistoryContainsRecordedEntries() {
+        performDraw();
+        performDraw();
+
+        assertEquals(2, undoManager.exportHistory().size());
+    }
+
+    @Test
+    public void exportHistoryPreservesNewestToOldestOrder() {
+        performDraw();
+        performDraw();
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                undoManager.exportHistory();
+
+        assertEquals(
+                22,
+                entries.get(0).getSnapshot().getStock().size()
+        );
+
+        assertEquals(
+                23,
+                entries.get(1).getSnapshot().getStock().size()
+        );
+
+        assertEquals(
+                24,
+                entries.get(2).getSnapshot().getStock().size()
+        );
+    }
+
+    @Test
+    public void exportHistoryPreservesReversibleScoreChange() {
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        undoManager.recordAction(snapshot, 15);
+
+        assertEquals(
+                15,
+                undoManager.exportHistory()
+                        .get(0).getReversibleScoreChange()
+        );
+    }
+
+    @Test
+    public void modifyingExportedHistoryDoesNotChangeInternalHistory() {
+        performDraw();
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                undoManager.exportHistory();
+
+        entries.clear();
+
+        assertEquals(2, undoManager.getHistorySize());
+        assertTrue(undoManager.canUndo());
+    }
+
+    // UNDO ENTRY TESTS
+
+    @Test
+    public void undoEntryPreservesSnapshot() {
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        UndoManager.UndoEntry entry =
+                new UndoManager.UndoEntry(snapshot, 0);
+
+        assertSame(snapshot, entry.getSnapshot());
+    }
+
+    @Test
+    public void undoEntryPreservesNegativeScoreChange() {
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        UndoManager.UndoEntry entry =
+                new UndoManager.UndoEntry(snapshot, -10);
+
+        assertEquals(-10, entry.getReversibleScoreChange());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void undoEntryRejectsNullSnapshot() {
+        new UndoManager.UndoEntry(null, 0);
+    }
+
+    // HISTORY IMPORT TESTS
+
+    @Test
+    public void importHistoryRestoresEntries() {
+        performDraw();
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                undoManager.exportHistory();
+
+        UndoManager restoredManager = new UndoManager(state);
+
+        restoredManager.importHistory(entries);
+
+        assertEquals(2, restoredManager.getHistorySize());
+        assertTrue(restoredManager.canUndo());
+    }
+
+    @Test
+    public void importHistoryPreservesEntryOrder() {
+        performDraw();
+        performDraw();
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                undoManager.exportHistory();
+
+        UndoManager restoredManager = new UndoManager(state);
+
+        restoredManager.importHistory(entries);
+
+        ArrayList<UndoManager.UndoEntry> restoredEntries =
+                restoredManager.exportHistory();
+
+        for (int i = 0; i < entries.size(); i++) {
+            assertSame(entries.get(i), restoredEntries.get(i));
+        }
+    }
+
+    @Test
+    public void importHistoryReplacesExistingHistory() {
+        performDraw();
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                new ArrayList<>();
+
+        entries.add(
+                new UndoManager.UndoEntry(
+                        new GameSnapshot(state),
+                        0
+                )
+        );
+
+        undoManager.importHistory(entries);
+
+        assertEquals(1, undoManager.getHistorySize());
+    }
+
+    @Test
+    public void importEmptyHistoryClearsExistingHistory() {
+        performDraw();
+        performDraw();
+
+        undoManager.importHistory(new ArrayList<>());
+
+        assertEquals(0, undoManager.getHistorySize());
+        assertFalse(undoManager.canUndo());
+    }
+
+    @Test
+    public void modifyingImportedListDoesNotChangeInternalHistory() {
+        performDraw();
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                undoManager.exportHistory();
+
+        UndoManager restoredManager = new UndoManager(state);
+
+        restoredManager.importHistory(entries);
+
+        entries.clear();
+
+        assertEquals(2, restoredManager.getHistorySize());
+    }
+
+    @Test
+    public void importHistoryDoesNotModifyGameValues() {
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                undoManager.exportHistory();
+
+        state.setScore(100);
+        state.setMoves(25);
+        state.setElapsedTimeMs(30000);
+        state.setRemainingUndos(2);
+
+        undoManager.importHistory(entries);
+
+        assertEquals(100, state.getScore());
+        assertEquals(25, state.getMoves());
+        assertEquals(30000L, state.getElapsedTimeMs());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    // HISTORY IMPORT VALIDATION TESTS
+
+    @Test(expected = IllegalArgumentException.class)
+    public void importHistoryRejectsNullList() {
+        undoManager.importHistory(null);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void importHistoryRejectsNullEntry() {
+        ArrayList<UndoManager.UndoEntry> entries =
+                new ArrayList<>();
+
+        entries.add(null);
+
+        undoManager.importHistory(entries);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void importHistoryRejectsMoreThanMaximumUndos() {
+        ArrayList<UndoManager.UndoEntry> entries =
+                new ArrayList<>();
+
+        for (int i = 0; i < 4; i++) {
+            entries.add(
+                    new UndoManager.UndoEntry(
+                            new GameSnapshot(state),
+                            0
+                    )
+            );
+        }
+
+        undoManager.importHistory(entries);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void importHistoryRejectsMoreThanRemainingUndos() {
+        performDraw();
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                undoManager.exportHistory();
+
+        state.setRemainingUndos(1);
+
+        undoManager.importHistory(entries);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void importHistoryRejectsEntriesWhenNoUndosRemain() {
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                undoManager.exportHistory();
+
+        state.setRemainingUndos(0);
+
+        undoManager.importHistory(entries);
+    }
+
+    @Test
+    public void importEmptyHistoryAllowedWhenNoUndosRemain() {
+        state.setRemainingUndos(0);
+
+        undoManager.importHistory(new ArrayList<>());
+
+        assertEquals(0, undoManager.getHistorySize());
+        assertFalse(undoManager.canUndo());
+    }
+
+    @Test
+    public void invalidImportPreservesExistingHistory() {
+        performDraw();
+        performDraw();
+
+        ArrayList<UndoManager.UndoEntry> originalEntries =
+                undoManager.exportHistory();
+
+        ArrayList<UndoManager.UndoEntry> invalidEntries =
+                new ArrayList<>();
+
+        invalidEntries.add(null);
+
+        try {
+            undoManager.importHistory(invalidEntries);
+            fail("Expected IllegalArgumentException.");
+        } catch (IllegalArgumentException expected) {
+            assertEquals(2, undoManager.getHistorySize());
+
+            ArrayList<UndoManager.UndoEntry> currentEntries =
+                    undoManager.exportHistory();
+
+            assertSame(
+                    originalEntries.get(0),
+                    currentEntries.get(0)
+            );
+
+            assertSame(
+                    originalEntries.get(1),
+                    currentEntries.get(1)
+            );
+        }
+    }
+
+    // RECONSTRUCTED UNDO OPERATION TESTS
+
+    @Test
+    public void importedHistoryAllowsUndo() {
+        GameSnapshot original = new GameSnapshot(state);
+
+        performDraw();
+
+        UndoManager restoredManager = new UndoManager(state);
+
+        restoredManager.importHistory(
+                undoManager.exportHistory()
+        );
+
+        assertTrue(restoredManager.undo());
+
+        assertBoardMatchesSnapshot(original);
+    }
+
+    @Test
+    public void importedHistoryUndoesMostRecentActionFirst() {
+        performDraw();
+        performDraw();
+        performDraw();
+
+        UndoManager restoredManager = new UndoManager(state);
+
+        restoredManager.importHistory(
+                undoManager.exportHistory()
+        );
+
+        assertTrue(restoredManager.undo());
+
+        assertEquals(22, state.getStock().size());
+        assertEquals(2, state.getDiscard().size());
+    }
+
+    @Test
+    public void importedHistorySupportsConsecutiveUndos() {
+        performDraw();
+        performDraw();
+        performDraw();
+
+        UndoManager restoredManager = new UndoManager(state);
+
+        restoredManager.importHistory(
+                undoManager.exportHistory()
+        );
+
+        assertTrue(restoredManager.undo());
+        assertEquals(22, state.getStock().size());
+
+        assertTrue(restoredManager.undo());
+        assertEquals(23, state.getStock().size());
+
+        assertTrue(restoredManager.undo());
+        assertEquals(24, state.getStock().size());
+
+        assertFalse(restoredManager.undo());
+        assertEquals(0, state.getRemainingUndos());
+    }
+
+    @Test
+    public void importedHistoryReversesPositiveScoreChange() {
+        state.setScore(100);
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        state.setScore(115);
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                new ArrayList<>();
+
+        entries.add(
+                new UndoManager.UndoEntry(snapshot, 15)
+        );
+
+        undoManager.importHistory(entries);
+
+        assertTrue(undoManager.undo());
+
+        assertEquals(90, state.getScore());
+    }
+
+    @Test
+    public void importedHistoryReversesNegativeScoreChange() {
+        state.setScore(100);
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        state.setScore(90);
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                new ArrayList<>();
+
+        entries.add(
+                new UndoManager.UndoEntry(snapshot, -10)
+        );
+
+        undoManager.importHistory(entries);
+
+        assertTrue(undoManager.undo());
+
+        assertEquals(90, state.getScore());
+    }
+
+    @Test
+    public void importedHistoryDoesNotRefundRecyclePenalty() {
+        state.setScore(100);
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        state.setScore(80);
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                new ArrayList<>();
+
+        entries.add(
+                new UndoManager.UndoEntry(snapshot, 0)
+        );
+
+        undoManager.importHistory(entries);
+
+        assertTrue(undoManager.undo());
+
+        assertEquals(70, state.getScore());
+    }
+
+    @Test
+    public void importedHistoryUndoPreservesElapsedTime() {
+        performDraw();
+
+        UndoManager restoredManager = new UndoManager(state);
+
+        restoredManager.importHistory(
+                undoManager.exportHistory()
+        );
+
+        state.setElapsedTimeMs(45000);
+
+        assertTrue(restoredManager.undo());
+
+        assertEquals(45000L, state.getElapsedTimeMs());
+    }
+
+    @Test
+    public void importedHistoryUndoConsumesRemainingUndo() {
+        performDraw();
+
+        UndoManager restoredManager = new UndoManager(state);
+
+        restoredManager.importHistory(
+                undoManager.exportHistory()
+        );
+
+        state.setRemainingUndos(1);
+
+        assertTrue(restoredManager.undo());
+
+        assertEquals(0, state.getRemainingUndos());
+        assertFalse(restoredManager.canUndo());
     }
 
     // Helper methods

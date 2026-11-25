@@ -2374,6 +2374,109 @@ public class GameEngineTest {
         assertTrue(state.getStock().isEmpty());
     }
 
+    // PERSISTENT UNDO HISTORY TESTS
+
+    @Test
+    public void engineExportsEmptyHistoryInitially() {
+        assertTrue(engine.exportUndoHistory().isEmpty());
+    }
+
+    @Test
+    public void engineExportsRecordedActions() {
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        assertEquals(2, engine.exportUndoHistory().size());
+    }
+
+    @Test
+    public void engineImportsUndoHistory() {
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        ArrayList<UndoManager.UndoEntry> entries =
+                engine.exportUndoHistory();
+
+        GameEngine restoredEngine = new GameEngine(state);
+
+        restoredEngine.importUndoHistory(entries);
+
+        assertEquals(2, restoredEngine.getUndoHistorySize());
+        assertTrue(restoredEngine.canUndo());
+    }
+
+    @Test
+    public void engineCanUndoImportedHistory() {
+        GameSnapshot original = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+
+        GameEngine restoredEngine = new GameEngine(state);
+
+        restoredEngine.importUndoHistory(
+                engine.exportUndoHistory()
+        );
+
+        assertTrue(restoredEngine.undo());
+
+        assertBoardMatchesSnapshot(original);
+    }
+
+    @Test
+    public void engineRecordsNewActionsAfterHistoryImport() {
+        assertTrue(engine.drawCard());
+
+        GameEngine restoredEngine = new GameEngine(state);
+
+        restoredEngine.importUndoHistory(
+                engine.exportUndoHistory()
+        );
+
+        assertTrue(restoredEngine.drawCard());
+
+        assertEquals(2, restoredEngine.getUndoHistorySize());
+
+        assertTrue(restoredEngine.undo());
+        assertEquals(23, state.getStock().size());
+
+        assertTrue(restoredEngine.undo());
+        assertEquals(24, state.getStock().size());
+    }
+
+    @Test
+    public void engineRestartClearsImportedHistory() {
+        assertTrue(engine.drawCard());
+
+        GameEngine restoredEngine = new GameEngine(state);
+
+        restoredEngine.importUndoHistory(
+                engine.exportUndoHistory()
+        );
+
+        restoredEngine.restart();
+
+        assertEquals(0, restoredEngine.getUndoHistorySize());
+        assertEquals(3, state.getRemainingUndos());
+        assertFalse(restoredEngine.canUndo());
+    }
+
+    @Test
+    public void engineNewGameClearsImportedHistory() {
+        assertTrue(engine.drawCard());
+
+        GameEngine restoredEngine = new GameEngine(state);
+
+        restoredEngine.importUndoHistory(
+                engine.exportUndoHistory()
+        );
+
+        restoredEngine.newGame();
+
+        assertEquals(0, restoredEngine.getUndoHistorySize());
+        assertEquals(3, state.getRemainingUndos());
+        assertFalse(restoredEngine.canUndo());
+    }
+
     // Helper methods
     private Card faceUpCard(
             Card.Suit suit,
