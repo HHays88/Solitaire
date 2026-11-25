@@ -53,7 +53,6 @@ public final class GameStateSerializer {
         // Preserve current game values
         json.put("score", state.getScore());
         json.put("moves", state.getMoves());
-        json.put("elapsedTimeMs", state.getElapsedTimeMs());
         json.put("remainingUndos", state.getRemainingUndos());
         json.put("gameWon", state.isGameWon());
         // Preserve undo history
@@ -194,19 +193,16 @@ public final class GameStateSerializer {
         // Retrieve saved game values
         int score = snapshot.getScore();
         int moves = json.getInt("moves");
-        long elapsedTimeMs = json.getLong("elapsedTimeMs");
         int remainingUndos = json.getInt("remainingUndos");
         // Validate before applying saved values
         validateGameValues(
                 score,
                 moves,
-                elapsedTimeMs,
                 remainingUndos
         );
         // Restore saved game values
         state.setScore(score);
         state.setMoves(moves);
-        state.setElapsedTimeMs(elapsedTimeMs);
         state.setRemainingUndos(remainingUndos);
         // Initialize engine using reconstructed state
         GameEngine engine = new GameEngine(state);
@@ -357,8 +353,8 @@ public final class GameStateSerializer {
     private static void validateGameValues(
             int score,
             int moves,
-            long elapsedTimeMs,
-            int remainingUndos) throws JSONException {
+            int remainingUndos)
+            throws JSONException {
         if (score < 0) {
             throw new JSONException(
                     "Saved score cannot be negative."
@@ -367,11 +363,6 @@ public final class GameStateSerializer {
         if (moves < 0) {
             throw new JSONException(
                     "Saved move count cannot be negative."
-            );
-        }
-        if (elapsedTimeMs < 0) {
-            throw new JSONException(
-                    "Saved elapsed time cannot be negative."
             );
         }
         if (remainingUndos < 0

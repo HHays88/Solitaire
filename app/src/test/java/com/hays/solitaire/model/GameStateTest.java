@@ -172,7 +172,6 @@ public class GameStateTest {
 
         state.setScore(100);
         state.setMoves(25);
-        state.setElapsedTimeMs(60000);
         state.setRemainingUndos(1);
         state.setGameWon(true);
 
@@ -180,7 +179,6 @@ public class GameStateTest {
 
         assertEquals(0, state.getScore());
         assertEquals(0, state.getMoves());
-        assertEquals(0L, state.getElapsedTimeMs());
         assertEquals(3, state.getRemainingUndos());
         assertFalse(state.isGameWon());
     }
@@ -203,16 +201,6 @@ public class GameStateTest {
         state.setMoves(-1);
 
         assertEquals(0, state.getMoves());
-    }
-
-    @Test
-    public void elapsedTimeCannotBeNegative() {
-
-        GameState state = new GameState();
-
-        state.setElapsedTimeMs(-1000);
-
-        assertEquals(0L, state.getElapsedTimeMs());
     }
 
     @Test
@@ -266,7 +254,6 @@ public class GameStateTest {
 
         assertEquals(0, state.getScore());
         assertEquals(0, state.getMoves());
-        assertEquals(0L, state.getElapsedTimeMs());
         assertEquals(3, state.getRemainingUndos());
         assertFalse(state.isGameWon());
     }

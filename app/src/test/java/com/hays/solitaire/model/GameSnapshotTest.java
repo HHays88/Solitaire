@@ -99,11 +99,9 @@ public class GameSnapshotTest {
         GameState state = new GameState();
         GameSnapshot snapshot = new GameSnapshot(state);
         state.setMoves(10);
-        state.setElapsedTimeMs(30000);
         state.setRemainingUndos(2);
         snapshot.restore(state);
         assertEquals(10, state.getMoves());
-        assertEquals(30000L, state.getElapsedTimeMs());
         assertEquals(2, state.getRemainingUndos());
     }
 
@@ -443,12 +441,10 @@ public class GameSnapshotTest {
         GameSnapshot snapshot = reconstructSnapshot(state);
         state.setScore(100);
         state.setMoves(25);
-        state.setElapsedTimeMs(15000);
         state.setRemainingUndos(1);
         snapshot.restore(state);
         assertEquals(100, state.getScore());
         assertEquals(25, state.getMoves());
-        assertEquals(15000L, state.getElapsedTimeMs());
         assertEquals(1, state.getRemainingUndos());
     }
 

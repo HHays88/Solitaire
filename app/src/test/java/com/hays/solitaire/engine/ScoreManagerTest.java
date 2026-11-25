@@ -229,14 +229,12 @@ public class ScoreManagerTest {
 
     @Test
     public void scoringDoesNotChangeOtherGameValues() {
-        state.setElapsedTimeMs(5000);
         state.setRemainingUndos(2);
         ScoreManager.adjustScore(
                 state,
                 ScoreManager.FOUNDATION_POINTS
         );
         ScoreManager.incrementMoves(state);
-        assertEquals(5000L, state.getElapsedTimeMs());
         assertEquals(2, state.getRemainingUndos());
         assertFalse(state.isGameWon());
     }

@@ -1387,13 +1387,11 @@ public class GameEngineTest {
     public void normalGameplayDoesNotConsumeUndosOrChangeTime() {
 
         state.setRemainingUndos(2);
-        state.setElapsedTimeMs(5000);
 
         assertTrue(engine.drawCard());
         assertTrue(engine.drawCard());
 
         assertEquals(2, state.getRemainingUndos());
-        assertEquals(5000L, state.getElapsedTimeMs());
         assertEquals(2, state.getMoves());
     }
 
@@ -1862,7 +1860,6 @@ public class GameEngineTest {
 
         state.setScore(50);
         state.setMoves(10);
-        state.setElapsedTimeMs(5000);
 
         GameSnapshot snapshot = new GameSnapshot(state);
 
@@ -1872,22 +1869,7 @@ public class GameEngineTest {
 
         assertEquals(50, state.getScore());
         assertEquals(10, state.getMoves());
-        assertEquals(5000L, state.getElapsedTimeMs());
         assertEquals(3, state.getRemainingUndos());
-    }
-
-    @Test
-    public void engineUndoPreservesElapsedTime() {
-
-        state.setElapsedTimeMs(5000);
-
-        assertTrue(engine.drawCard());
-
-        state.setElapsedTimeMs(15000);
-
-        assertTrue(engine.undo());
-
-        assertEquals(15000L, state.getElapsedTimeMs());
     }
 
     // Undo scoring edge cases
@@ -2081,14 +2063,12 @@ public class GameEngineTest {
 
         state.setScore(100);
         state.setMoves(25);
-        state.setElapsedTimeMs(15000);
         state.setRemainingUndos(1);
 
         engine.restart();
 
         assertEquals(0, state.getScore());
         assertEquals(0, state.getMoves());
-        assertEquals(0L, state.getElapsedTimeMs());
         assertEquals(3, state.getRemainingUndos());
         assertFalse(state.isGameWon());
     }
@@ -2194,14 +2174,12 @@ public class GameEngineTest {
 
         state.setScore(100);
         state.setMoves(25);
-        state.setElapsedTimeMs(15000);
         state.setRemainingUndos(1);
 
         engine.newGame();
 
         assertEquals(0, state.getScore());
         assertEquals(0, state.getMoves());
-        assertEquals(0L, state.getElapsedTimeMs());
         assertEquals(3, state.getRemainingUndos());
         assertFalse(state.isGameWon());
     }

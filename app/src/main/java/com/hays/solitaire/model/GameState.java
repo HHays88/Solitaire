@@ -23,11 +23,10 @@ public class GameState {
     // stacked cards in the pile
     private final ArrayList<ArrayList<Card>> tableau;
 
-    // Initialize variables for Score, Move Count, Elapsed Time,
+    // Initialize variables for Score, Move Count,
     // available undos, and detecting if game complete
     private int score;
     private int moves;
-    private long elapsedTimeMs;
     private int remainingUndos;
     private boolean gameWon;
 
@@ -165,12 +164,11 @@ public class GameState {
         }
     }
 
-    // Reset score, move count, elapsed time, undo allocation, and declare
+    // Reset score, move count, undo allocation, and declare
     // win state to false
     private void resetGameValues() {
         score = 0;
         moves = 0;
-        elapsedTimeMs = 0;
         remainingUndos = MAX_UNDOS;
         gameWon = false;
     }
@@ -222,9 +220,6 @@ public class GameState {
     public int getMoves() {
         return moves;
     }
-    public long getElapsedTimeMs() {
-        return elapsedTimeMs;
-    }
     public int getRemainingUndos() {
         return remainingUndos;
     }
@@ -238,9 +233,6 @@ public class GameState {
     }
     public void setMoves(int moves) {
         this.moves = Math.max(0, moves);
-    }
-    public void setElapsedTimeMs(long elapsedTimeMs) {
-        this.elapsedTimeMs = Math.max(0, elapsedTimeMs);
     }
     public void setRemainingUndos(int remainingUndos) {
         this.remainingUndos = Math.max(

@@ -74,13 +74,11 @@ public class UndoManagerTest {
 
         state.setScore(50);
         state.setMoves(10);
-        state.setElapsedTimeMs(5000);
 
         assertFalse(undoManager.undo());
 
         assertEquals(50, state.getScore());
         assertEquals(10, state.getMoves());
-        assertEquals(5000L, state.getElapsedTimeMs());
         assertEquals(3, state.getRemainingUndos());
     }
 
@@ -159,13 +157,11 @@ public class UndoManagerTest {
 
         state.setScore(50);
         state.setMoves(10);
-        state.setElapsedTimeMs(5000);
 
         undoManager.clearHistory();
 
         assertEquals(50, state.getScore());
         assertEquals(10, state.getMoves());
-        assertEquals(5000L, state.getElapsedTimeMs());
         assertEquals(1, state.getDiscard().size());
     }
 
@@ -587,7 +583,7 @@ public class UndoManagerTest {
         assertTrue(state.getDiscard().isEmpty());
     }
 
-    // Move counting and elapsed time tests
+    // Move counting tests
 
     @Test
     public void undoIncrementsMovesInsteadOfRestoringCount() {
@@ -617,20 +613,6 @@ public class UndoManagerTest {
         assertTrue(undoManager.undo());
 
         assertEquals(6, state.getMoves());
-    }
-
-    @Test
-    public void undoDoesNotRestoreElapsedTime() {
-
-        state.setElapsedTimeMs(5000);
-
-        performDraw();
-
-        state.setElapsedTimeMs(15000);
-
-        assertTrue(undoManager.undo());
-
-        assertEquals(15000L, state.getElapsedTimeMs());
     }
 
     // HISTORY EXPORT TESTS
@@ -823,14 +805,12 @@ public class UndoManagerTest {
 
         state.setScore(100);
         state.setMoves(25);
-        state.setElapsedTimeMs(30000);
         state.setRemainingUndos(2);
 
         undoManager.importHistory(entries);
 
         assertEquals(100, state.getScore());
         assertEquals(25, state.getMoves());
-        assertEquals(30000L, state.getElapsedTimeMs());
         assertEquals(2, state.getRemainingUndos());
     }
 
@@ -1063,23 +1043,6 @@ public class UndoManagerTest {
         assertTrue(undoManager.undo());
 
         assertEquals(70, state.getScore());
-    }
-
-    @Test
-    public void importedHistoryUndoPreservesElapsedTime() {
-        performDraw();
-
-        UndoManager restoredManager = new UndoManager(state);
-
-        restoredManager.importHistory(
-                undoManager.exportHistory()
-        );
-
-        state.setElapsedTimeMs(45000);
-
-        assertTrue(restoredManager.undo());
-
-        assertEquals(45000L, state.getElapsedTimeMs());
     }
 
     @Test

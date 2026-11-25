@@ -57,7 +57,6 @@ public class GameStateSerializerTest {
                 "tableau",
                 "score",
                 "moves",
-                "elapsedTimeMs",
                 "remainingUndos",
                 "gameWon",
                 "undoHistory"
@@ -575,21 +574,6 @@ public class GameStateSerializerTest {
     }
 
     @Test
-    public void serializedGamePreservesElapsedTime()
-            throws JSONException {
-
-        state.setElapsedTimeMs(185000L);
-
-        JSONObject json =
-                GameStateSerializer.serializeGame(engine);
-
-        assertEquals(
-                185000L,
-                json.getLong("elapsedTimeMs")
-        );
-    }
-
-    @Test
     public void serializedGamePreservesRemainingUndos()
             throws JSONException {
 
@@ -838,14 +822,12 @@ public class GameStateSerializerTest {
 
         state.setScore(150);
         state.setMoves(25);
-        state.setElapsedTimeMs(60000L);
         state.setRemainingUndos(2);
 
         GameStateSerializer.serializeGame(engine);
 
         assertEquals(150, state.getScore());
         assertEquals(25, state.getMoves());
-        assertEquals(60000L, state.getElapsedTimeMs());
         assertEquals(2, state.getRemainingUndos());
         assertFalse(state.isGameWon());
     }
@@ -1096,17 +1078,6 @@ public class GameStateSerializerTest {
         GameState loaded = deserializeCurrentGame().getState();
 
         assertEquals(32, loaded.getMoves());
-    }
-
-    @Test
-    public void deserializationPreservesElapsedTime()
-            throws JSONException {
-
-        state.setElapsedTimeMs(185000L);
-
-        GameState loaded = deserializeCurrentGame().getState();
-
-        assertEquals(185000L, loaded.getElapsedTimeMs());
     }
 
     @Test
@@ -1495,24 +1466,6 @@ public class GameStateSerializerTest {
     }
 
     @Test
-    public void loadedGameUndoPreservesElapsedTime()
-            throws JSONException {
-
-        assertTrue(engine.drawCard());
-
-        state.setElapsedTimeMs(60000L);
-
-        GameEngine loaded = deserializeCurrentGame();
-
-        assertTrue(loaded.undo());
-
-        assertEquals(
-                60000L,
-                loaded.getState().getElapsedTimeMs()
-        );
-    }
-
-    @Test
     public void loadedCompletedGameRejectsFurtherMoves()
             throws JSONException {
 
@@ -1574,7 +1527,6 @@ public class GameStateSerializerTest {
 
         state.setScore(100);
         state.setMoves(25);
-        state.setElapsedTimeMs(60000L);
         state.setRemainingUndos(2);
 
         GameEngine loaded = deserializeCurrentGame();
@@ -1583,7 +1535,6 @@ public class GameStateSerializerTest {
 
         assertEquals(0, loaded.getState().getScore());
         assertEquals(0, loaded.getState().getMoves());
-        assertEquals(0L, loaded.getState().getElapsedTimeMs());
 
         assertEquals(
                 GameState.MAX_UNDOS,
@@ -1764,18 +1715,6 @@ public class GameStateSerializerTest {
                 GameStateSerializer.serializeGame(engine);
 
         json.put("moves", -1);
-
-        GameStateSerializer.deserializeGame(json);
-    }
-
-    @Test(expected = JSONException.class)
-    public void deserializationRejectsNegativeElapsedTime()
-            throws JSONException {
-
-        JSONObject json =
-                GameStateSerializer.serializeGame(engine);
-
-        json.put("elapsedTimeMs", -1L);
 
         GameStateSerializer.deserializeGame(json);
     }

@@ -154,8 +154,6 @@ public class SaveManagerTest {
                 )
         );
 
-        state.setElapsedTimeMs(185000L);
-
         assertTrue(saveManager.saveGame(engine));
 
         GameEngine loaded = saveManager.loadGame();
@@ -177,11 +175,6 @@ public class SaveManagerTest {
         assertEquals(
                 state.getMoves(),
                 loadedState.getMoves()
-        );
-
-        assertEquals(
-                state.getElapsedTimeMs(),
-                loadedState.getElapsedTimeMs()
         );
 
         assertEquals(
@@ -256,7 +249,6 @@ public class SaveManagerTest {
         assertTrue(engine.drawCard());
 
         state.setScore(75);
-        state.setElapsedTimeMs(30000L);
 
         assertTrue(saveManager.saveGame(engine));
 
@@ -275,7 +267,6 @@ public class SaveManagerTest {
         );
 
         assertEquals(75, loaded.getState().getScore());
-        assertEquals(30000L, loaded.getState().getElapsedTimeMs());
     }
 
     @Test
@@ -317,8 +308,6 @@ public class SaveManagerTest {
                 )
         );
 
-        state.setElapsedTimeMs(60000L);
-
         assertTrue(saveManager.saveGame(engine));
 
         GameEngine loaded = saveManager.loadGame();
@@ -333,7 +322,6 @@ public class SaveManagerTest {
         );
 
         assertEquals(0, loaded.getState().getMoves());
-        assertEquals(0L, loaded.getState().getElapsedTimeMs());
 
         assertEquals(
                 GameState.MAX_UNDOS,
