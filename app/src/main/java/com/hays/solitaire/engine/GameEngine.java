@@ -4,15 +4,43 @@ package com.hays.solitaire.engine;
 import com.hays.solitaire.model.Card;
 import com.hays.solitaire.model.Deck;
 import com.hays.solitaire.model.GameState;
+import com.hays.solitaire.model.GameSnapshot;
 
 import java.util.ArrayList;
 
 public final class GameEngine {
 
-    // Receive existing game state and reflect changes
+    // DELEGATING METHODS
+    // This allows the interface to interact with GameEngine instead
+    // of communicating with various managers. Because GameState does
+    // not work with UndoManager, GameEngine now coordinates classes
+    public boolean canUndo() {
+        return undoManager.canUndo();
+    }
+    public boolean undo() {
+        return undoManager.undo();
+    }
+    // Game management operations
+    public void restart() {
+        state.restart();
+        undoManager.clearHistory();
+    }
+    public void newGame() {
+        state.newGame();
+        undoManager.clearHistory();
+    }
+
+    // Receive existing game state, reflect changes, and
+    // maintain instance of UndoManager
     private final GameState state;
+    public int getUndoHistorySize() {
+        return undoManager.getHistorySize();
+    }
+    private final UndoManager undoManager;
+
     public GameEngine(GameState state) {
         this.state = state;
+        this.undoManager = new UndoManager(state);
     }
 
     // STOCK OPERATIONS
@@ -29,11 +57,13 @@ public final class GameEngine {
                 || !MoveValidator.canDraw(state)) {
             return false;
         }
+        GameSnapshot snapshot = captureSnapshot();
         Card card = removeTopCard(state.getStock());
         card.setFaceUp(true);
         state.getDiscard().add(card);
         // increment move count
         ScoreManager.incrementMoves(state);
+        recordAction(snapshot, 0);
         return true;
     }
 
@@ -46,6 +76,7 @@ public final class GameEngine {
                 || !MoveValidator.canRecycle(state)) {
             return false;
         }
+        GameSnapshot snapshot = captureSnapshot();
         ArrayList<Card> discard = state.getDiscard();
         ArrayList<Card> stock = state.getStock();
         while (!discard.isEmpty()) {
@@ -59,6 +90,7 @@ public final class GameEngine {
                 ScoreManager.RECYCLE_PENALTY
         );
         ScoreManager.incrementMoves(state);
+        recordAction(snapshot, 0);
         return true;
     }
 
@@ -80,6 +112,8 @@ public final class GameEngine {
                 destinationColumn)) {
             return false;
         }
+        GameSnapshot snapshot = captureSnapshot();
+        int reversibleScoreChange = 0;
         ArrayList<Card> source =
                 state.getTableauColumn(sourceColumn);
         ArrayList<Card> destination =
@@ -90,12 +124,13 @@ public final class GameEngine {
         source.subList(startIndex, source.size()).clear();
         // Adjust score and increment move count
         if (revealTopCard(source)) {
-            ScoreManager.adjustScore(
+            reversibleScoreChange = ScoreManager.adjustScore(
                     state,
                     ScoreManager.REVEAL_POINTS
             );
         }
         ScoreManager.incrementMoves(state);
+        recordAction(snapshot, reversibleScoreChange);
         return true;
     }
 
@@ -110,22 +145,23 @@ public final class GameEngine {
                 suit)) {
             return false;
         }
+        GameSnapshot snapshot = captureSnapshot();
         ArrayList<Card> source =
                 state.getTableauColumn(sourceColumn);
         Card card = removeTopCard(source);
         state.getFoundation(suit).add(card);
-        // Adjust score and increment move count
-        ScoreManager.adjustScore(
+        int reversibleScoreChange = ScoreManager.adjustScore(
                 state,
                 ScoreManager.FOUNDATION_POINTS
         );
         if (revealTopCard(source)) {
-            ScoreManager.adjustScore(
+            reversibleScoreChange += ScoreManager.adjustScore(
                     state,
                     ScoreManager.REVEAL_POINTS
             );
         }
         ScoreManager.incrementMoves(state);
+        recordAction(snapshot, reversibleScoreChange);
         checkForWin();
         return true;
     }
@@ -139,14 +175,15 @@ public final class GameEngine {
                 destinationColumn)) {
             return false;
         }
+        GameSnapshot snapshot = captureSnapshot();
         Card card = removeTopCard(state.getDiscard());
         state.getTableauColumn(destinationColumn).add(card);
-        // adjust score and increment move count
-        ScoreManager.adjustScore(
+        int reversibleScoreChange = ScoreManager.adjustScore(
                 state,
                 ScoreManager.DISCARD_TO_TABLEAU_POINTS
         );
         ScoreManager.incrementMoves(state);
+        recordAction(snapshot, reversibleScoreChange);
         return true;
     }
 
@@ -159,14 +196,15 @@ public final class GameEngine {
                 suit)) {
             return false;
         }
+        GameSnapshot snapshot = captureSnapshot();
         Card card = removeTopCard(state.getDiscard());
         state.getFoundation(suit).add(card);
-        // adjust score and increment move count
-        ScoreManager.adjustScore(
+        int reversibleScoreChange = ScoreManager.adjustScore(
                 state,
                 ScoreManager.FOUNDATION_POINTS
         );
         ScoreManager.incrementMoves(state);
+        recordAction(snapshot, reversibleScoreChange);
         checkForWin();
         return true;
     }
@@ -182,16 +220,17 @@ public final class GameEngine {
                 destinationColumn)) {
             return false;
         }
+        GameSnapshot snapshot = captureSnapshot();
         Card card = removeTopCard(
                 state.getFoundation(suit)
         );
         state.getTableauColumn(destinationColumn).add(card);
-        // adjust score and increment move count
-        ScoreManager.adjustScore(
+        int reversibleScoreChange = ScoreManager.adjustScore(
                 state,
                 ScoreManager.FOUNDATION_REMOVAL_PENALTY
         );
         ScoreManager.incrementMoves(state);
+        recordAction(snapshot, reversibleScoreChange);
         return true;
     }
 
@@ -230,5 +269,27 @@ public final class GameEngine {
     // GETTER
     public GameState getState() {
         return state;
+    }
+
+    // SNAPSHOT AND ACTION RECORDING HELPERS
+
+    // If no undos remain, no deep copies of the game board created
+    private GameSnapshot captureSnapshot() {
+        if (state.getRemainingUndos() == 0) {
+            return null;
+        }
+        return new GameSnapshot(state);
+    }
+
+    // Only valid snapshots are recorded. Centralized to avoid redundancy
+    private void recordAction(
+            GameSnapshot snapshot,
+            int reversibleScoreChange) {
+        if (snapshot != null) {
+            undoManager.recordAction(
+                    snapshot,
+                    reversibleScoreChange
+            );
+        }
     }
 }

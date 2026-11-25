@@ -1397,6 +1397,983 @@ public class GameEngineTest {
         assertEquals(2, state.getMoves());
     }
 
+    // Automatic history recording tests
+
+    @Test
+    public void newEngineHasNoUndoHistory() {
+
+        assertEquals(0, engine.getUndoHistorySize());
+        assertFalse(engine.canUndo());
+        assertEquals(3, state.getRemainingUndos());
+    }
+
+    @Test
+    public void successfulActionAutomaticallyRecordsHistory() {
+
+        assertTrue(engine.drawCard());
+
+        assertEquals(1, engine.getUndoHistorySize());
+        assertTrue(engine.canUndo());
+        assertEquals(3, state.getRemainingUndos());
+    }
+
+    @Test
+    public void invalidActionsDoNotCreateHistory() {
+
+        clearPiles();
+
+        assertFalse(engine.drawCard());
+        assertFalse(engine.recycleDiscard());
+
+        assertFalse(engine.moveTableauToTableau(
+                0, 0, 1
+        ));
+
+        assertFalse(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertFalse(engine.moveDiscardToTableau(0));
+
+        assertFalse(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertFalse(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(0, engine.getUndoHistorySize());
+        assertFalse(engine.canUndo());
+    }
+
+    @Test
+    public void invalidActionPreservesExistingHistory() {
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+
+        assertFalse(engine.recycleDiscard());
+
+        assertEquals(1, engine.getUndoHistorySize());
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+    }
+
+    @Test
+    public void automaticHistoryRespectsMaximumSize() {
+
+        for (int i = 0; i < 5; i++) {
+            assertTrue(engine.drawCard());
+        }
+
+        assertEquals(3, engine.getUndoHistorySize());
+        assertEquals(3, state.getRemainingUndos());
+    }
+
+    @Test
+    public void exhaustedUndoAllowancePreventsRecording() {
+
+        state.setRemainingUndos(0);
+
+        assertTrue(engine.drawCard());
+
+        assertEquals(0, engine.getUndoHistorySize());
+        assertFalse(engine.canUndo());
+        assertEquals(1, state.getMoves());
+    }
+
+    // Gameplay undo integration tests
+
+    @Test
+    public void undoDrawRestoresBoardAndAppliesPenalty() {
+
+        state.setScore(50);
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertEquals(40, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+        assertEquals(0, engine.getUndoHistorySize());
+    }
+
+    @Test
+    public void undoRecycleRestoresBoardWithoutRefundingPenalty() {
+
+        state.setScore(100);
+
+        while (!state.getStock().isEmpty()) {
+            assertTrue(engine.drawCard());
+        }
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.recycleDiscard());
+
+        assertEquals(80, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertEquals(70, state.getScore());
+        assertEquals(26, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void undoTableauTransferRestoresBoard() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.QUEEN)
+        );
+
+        state.getTableauColumn(1).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.KING)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveTableauToTableau(
+                0, 0, 1
+        ));
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertEquals(40, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void undoTableauSequenceReversesAutomaticReveal() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getTableauColumn(0).add(
+                new Card(Card.Suit.DIAMONDS, Card.Rank.FIVE)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.QUEEN)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.CLUBS, Card.Rank.JACK)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.DIAMONDS, Card.Rank.TEN)
+        );
+
+        state.getTableauColumn(1).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.KING)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveTableauToTableau(
+                0, 1, 1
+        ));
+
+        assertTrue(
+                state.getTableauColumn(0).get(0).isFaceUp()
+        );
+
+        assertEquals(55, state.getScore());
+        assertEquals(1, engine.getUndoHistorySize());
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertFalse(
+                state.getTableauColumn(0).get(0).isFaceUp()
+        );
+
+        assertEquals(40, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void undoTableauToFoundationReversesFoundationPoints() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertEquals(60, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertEquals(40, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void undoFoundationMoveReversesBothScoringEvents() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getTableauColumn(0).add(
+                new Card(Card.Suit.CLUBS, Card.Rank.JACK)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertEquals(65, state.getScore());
+        assertEquals(1, engine.getUndoHistorySize());
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertFalse(
+                state.getTableauColumn(0).get(0).isFaceUp()
+        );
+
+        assertEquals(40, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void undoDiscardToTableauReversesAwardedPoints() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.KING)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveDiscardToTableau(0));
+
+        assertEquals(55, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertEquals(40, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void undoDiscardToFoundationReversesAwardedPoints() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertEquals(60, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertEquals(40, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void undoFoundationRemovalReversesDeduction() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getFoundation(Card.Suit.HEARTS).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.TWO)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(40, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertEquals(40, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    // Undo allowance and consecutive undo tests
+
+    @Test
+    public void engineEnforcesThreeUndoLimit() {
+
+        state.setScore(100);
+
+        for (int i = 0; i < 5; i++) {
+            assertTrue(engine.drawCard());
+        }
+
+        assertTrue(engine.undo());
+        assertTrue(engine.undo());
+        assertTrue(engine.undo());
+
+        assertFalse(engine.undo());
+        assertFalse(engine.canUndo());
+
+        assertEquals(0, state.getRemainingUndos());
+        assertEquals(0, engine.getUndoHistorySize());
+        assertEquals(70, state.getScore());
+        assertEquals(8, state.getMoves());
+        assertEquals(2, state.getDiscard().size());
+    }
+
+    @Test
+    public void newActionsDoNotRestoreUsedUndos() {
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.undo());
+
+        assertEquals(2, state.getRemainingUndos());
+
+        for (int i = 0; i < 5; i++) {
+            assertTrue(engine.drawCard());
+        }
+
+        assertEquals(2, state.getRemainingUndos());
+        assertEquals(2, engine.getUndoHistorySize());
+
+        assertTrue(engine.undo());
+        assertTrue(engine.undo());
+
+        assertFalse(engine.canUndo());
+        assertEquals(0, state.getRemainingUndos());
+    }
+
+    @Test
+    public void gameplayContinuesAfterUndosAreExhausted() {
+
+        for (int i = 0; i < 3; i++) {
+
+            assertTrue(engine.drawCard());
+            assertTrue(engine.undo());
+        }
+
+        assertEquals(0, state.getRemainingUndos());
+
+        assertTrue(engine.drawCard());
+
+        assertEquals(1, state.getDiscard().size());
+        assertEquals(7, state.getMoves());
+        assertEquals(0, engine.getUndoHistorySize());
+        assertFalse(engine.canUndo());
+    }
+
+    @Test
+    public void consecutiveUndosRestoreCorrectBoardOrder() {
+
+        GameSnapshot initial = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+
+        GameSnapshot afterFirstDraw =
+                new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+
+        GameSnapshot afterSecondDraw =
+                new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+
+        assertTrue(engine.undo());
+        assertBoardMatchesSnapshot(afterSecondDraw);
+
+        assertTrue(engine.undo());
+        assertBoardMatchesSnapshot(afterFirstDraw);
+
+        assertTrue(engine.undo());
+        assertBoardMatchesSnapshot(initial);
+    }
+
+    @Test
+    public void unsuccessfulEngineUndoDoesNotChangeGameValues() {
+
+        state.setScore(50);
+        state.setMoves(10);
+        state.setElapsedTimeMs(5000);
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertFalse(engine.undo());
+
+        assertBoardMatchesSnapshot(snapshot);
+
+        assertEquals(50, state.getScore());
+        assertEquals(10, state.getMoves());
+        assertEquals(5000L, state.getElapsedTimeMs());
+        assertEquals(3, state.getRemainingUndos());
+    }
+
+    @Test
+    public void engineUndoPreservesElapsedTime() {
+
+        state.setElapsedTimeMs(5000);
+
+        assertTrue(engine.drawCard());
+
+        state.setElapsedTimeMs(15000);
+
+        assertTrue(engine.undo());
+
+        assertEquals(15000L, state.getElapsedTimeMs());
+    }
+
+    // Undo scoring edge cases
+
+    @Test
+    public void consecutiveUndosPreservePreviousUndoPenalties() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        state.getStock().add(
+                new Card(Card.Suit.CLUBS, Card.Rank.FIVE)
+        );
+
+        assertTrue(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertEquals(60, state.getScore());
+
+        assertTrue(engine.drawCard());
+
+        assertTrue(engine.undo());
+
+        assertEquals(50, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertEquals(30, state.getScore());
+        assertEquals(4, state.getMoves());
+        assertEquals(1, state.getRemainingUndos());
+    }
+
+    @Test
+    public void consecutiveUndosPreserveRecyclePenalty() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getStock().add(
+                new Card(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.recycleDiscard());
+
+        assertEquals(30, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertEquals(20, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertEquals(10, state.getScore());
+        assertEquals(4, state.getMoves());
+
+        assertBoardMatchesSnapshot(snapshot);
+    }
+
+    @Test
+    public void undoFoundationRemovalRespectsScoreMinimum() {
+
+        clearPiles();
+
+        state.setScore(5);
+
+        state.getFoundation(Card.Suit.HEARTS).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.TWO)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(0, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertEquals(0, state.getScore());
+
+        assertBoardMatchesSnapshot(snapshot);
+    }
+
+    @Test
+    public void undoAtZeroStillCountsAndConsumesAllowance() {
+
+        assertEquals(0, state.getScore());
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.undo());
+
+        assertEquals(0, state.getScore());
+        assertEquals(2, state.getMoves());
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void consecutiveUndosRespectScoreMinimum() {
+
+        clearPiles();
+
+        state.setScore(5);
+
+        state.getFoundation(Card.Suit.HEARTS).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.TWO)
+        );
+
+        state.getStock().add(
+                new Card(Card.Suit.CLUBS, Card.Rank.FIVE)
+        );
+
+        GameSnapshot snapshot = new GameSnapshot(state);
+
+        assertTrue(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(0, state.getScore());
+
+        assertTrue(engine.drawCard());
+
+        assertTrue(engine.undo());
+
+        assertEquals(0, state.getScore());
+
+        assertTrue(engine.undo());
+
+        assertEquals(0, state.getScore());
+        assertEquals(4, state.getMoves());
+        assertEquals(1, state.getRemainingUndos());
+
+        assertBoardMatchesSnapshot(snapshot);
+    }
+
+    // Restart integration tests
+
+    @Test
+    public void engineRestartRestoresOriginalDeal() {
+
+        GameSnapshot original = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+        assertTrue(engine.undo());
+
+        engine.restart();
+
+        assertBoardMatchesSnapshot(original);
+    }
+
+    @Test
+    public void engineRestartPreservesOriginalDeck() {
+
+        ArrayList<Card> originalDeck =
+                state.getOriginalDeck();
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        engine.restart();
+
+        assertPilesEqual(
+                originalDeck,
+                state.getOriginalDeck()
+        );
+    }
+
+    @Test
+    public void engineRestartResetsGameValues() {
+
+        assertTrue(engine.drawCard());
+
+        state.setScore(100);
+        state.setMoves(25);
+        state.setElapsedTimeMs(15000);
+        state.setRemainingUndos(1);
+
+        engine.restart();
+
+        assertEquals(0, state.getScore());
+        assertEquals(0, state.getMoves());
+        assertEquals(0L, state.getElapsedTimeMs());
+        assertEquals(3, state.getRemainingUndos());
+        assertFalse(state.isGameWon());
+    }
+
+    @Test
+    public void engineRestartClearsUndoHistory() {
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        assertEquals(2, engine.getUndoHistorySize());
+
+        engine.restart();
+
+        assertEquals(0, engine.getUndoHistorySize());
+        assertFalse(engine.canUndo());
+        assertFalse(engine.undo());
+    }
+
+    @Test
+    public void engineRestartRestoresExhaustedUndoAllowance() {
+
+        for (int i = 0; i < 3; i++) {
+
+            assertTrue(engine.drawCard());
+            assertTrue(engine.undo());
+        }
+
+        assertEquals(0, state.getRemainingUndos());
+
+        engine.restart();
+
+        assertEquals(3, state.getRemainingUndos());
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.canUndo());
+        assertTrue(engine.undo());
+
+        assertEquals(2, state.getRemainingUndos());
+    }
+
+    @Test
+    public void undoAfterRestartCannotRestorePreviousGame() {
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        engine.restart();
+
+        GameSnapshot restarted = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(restarted);
+
+        assertFalse(engine.canUndo());
+        assertEquals(0, engine.getUndoHistorySize());
+    }
+
+    // New game integration tests
+
+    @Test
+    public void engineNewGameCreatesValidInitialBoard() {
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        engine.newGame();
+
+        assertEquals(24, state.getStock().size());
+        assertTrue(state.getDiscard().isEmpty());
+
+        for (Card.Suit suit : Card.Suit.values()) {
+
+            assertTrue(state.getFoundation(suit).isEmpty());
+        }
+
+        for (int i = 0; i < GameState.TABLEAU_COLUMNS; i++) {
+
+            ArrayList<Card> column =
+                    state.getTableauColumn(i);
+
+            assertEquals(i + 1, column.size());
+
+            for (int j = 0; j < column.size(); j++) {
+
+                assertEquals(
+                        j == column.size() - 1,
+                        column.get(j).isFaceUp()
+                );
+            }
+        }
+
+        assertEquals(52, countCards());
+        assertEquals(52, countUniqueCards());
+    }
+
+    @Test
+    public void engineNewGameResetsGameValues() {
+
+        assertTrue(engine.drawCard());
+
+        state.setScore(100);
+        state.setMoves(25);
+        state.setElapsedTimeMs(15000);
+        state.setRemainingUndos(1);
+
+        engine.newGame();
+
+        assertEquals(0, state.getScore());
+        assertEquals(0, state.getMoves());
+        assertEquals(0L, state.getElapsedTimeMs());
+        assertEquals(3, state.getRemainingUndos());
+        assertFalse(state.isGameWon());
+    }
+
+    @Test
+    public void engineNewGameClearsUndoHistory() {
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        assertEquals(2, engine.getUndoHistorySize());
+
+        engine.newGame();
+
+        assertEquals(0, engine.getUndoHistorySize());
+        assertFalse(engine.canUndo());
+        assertFalse(engine.undo());
+    }
+
+    @Test
+    public void undoAfterNewGameCannotRestorePreviousGame() {
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        engine.newGame();
+
+        GameSnapshot newDeal = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.undo());
+
+        assertBoardMatchesSnapshot(newDeal);
+
+        assertFalse(engine.canUndo());
+    }
+
+    @Test
+    public void restartAfterNewGameUsesLatestDeal() {
+
+        engine.newGame();
+
+        GameSnapshot newDeal = new GameSnapshot(state);
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        engine.restart();
+
+        assertBoardMatchesSnapshot(newDeal);
+    }
+
+    // Completed game integration tests
+
+    @Test
+    public void winningMoveDisablesUndo() {
+
+        prepareNearWin();
+
+        state.setScore(590);
+        state.setMoves(149);
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertTrue(state.isGameWon());
+
+        assertFalse(engine.canUndo());
+        assertFalse(engine.undo());
+
+        assertEquals(600, state.getScore());
+        assertEquals(150, state.getMoves());
+        assertEquals(3, state.getRemainingUndos());
+    }
+
+    @Test
+    public void completedGameCanBeRestarted() {
+
+        prepareNearWin();
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertTrue(state.isGameWon());
+
+        engine.restart();
+
+        assertFalse(state.isGameWon());
+        assertEquals(0, state.getScore());
+        assertEquals(0, state.getMoves());
+        assertEquals(3, state.getRemainingUndos());
+        assertEquals(0, engine.getUndoHistorySize());
+
+        assertTrue(engine.drawCard());
+    }
+
+    @Test
+    public void completedGameAllowsNewGame() {
+
+        prepareNearWin();
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertTrue(state.isGameWon());
+
+        engine.newGame();
+
+        assertFalse(state.isGameWon());
+        assertEquals(0, state.getScore());
+        assertEquals(0, state.getMoves());
+        assertEquals(3, state.getRemainingUndos());
+        assertEquals(0, engine.getUndoHistorySize());
+
+        assertTrue(engine.drawCard());
+    }
+
+    // Card integrity tests
+
+    @Test
+    public void repeatedUndosPreserveAllCards() {
+
+        for (int i = 0; i < 3; i++) {
+
+            assertTrue(engine.drawCard());
+
+            assertEquals(52, countCards());
+            assertEquals(52, countUniqueCards());
+
+            assertTrue(engine.undo());
+
+            assertEquals(52, countCards());
+            assertEquals(52, countUniqueCards());
+        }
+    }
+
+    @Test
+    public void undoRecyclePreservesAllCards() {
+
+        while (!state.getStock().isEmpty()) {
+
+            assertTrue(engine.drawCard());
+        }
+
+        assertTrue(engine.recycleDiscard());
+
+        assertEquals(52, countCards());
+        assertEquals(52, countUniqueCards());
+
+        assertTrue(engine.undo());
+
+        assertEquals(52, countCards());
+        assertEquals(52, countUniqueCards());
+        assertEquals(24, state.getDiscard().size());
+        assertTrue(state.getStock().isEmpty());
+    }
+
     // Helper methods
     private Card faceUpCard(
             Card.Suit suit,
