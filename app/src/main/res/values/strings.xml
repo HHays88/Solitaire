@@ -1,3 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <!-- Application -->
     <string name="app_name">Solitaire</string>
+
+    <!-- Gameplay Information -->
+    <string name="score_format">Score: %1$d</string>
+    <string name="moves_format">Moves: %1$d</string>
+    <string name="undo_format">Undo (%1$d)</string>
+
+    <!-- Menu -->
+    <string name="menu">Menu</string>
+    <string name="new_game">New Game</string>
+    <string name="restart">Restart</string>
+
+    <!-- Dialog Buttons -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- New Game Confirmation -->
+    <string name="new_game_title">New Game</string>
+    <string name="new_game_message">Start a new game? Your current game will be lost.</string>
+
+    <!-- Restart Confirmation -->
+    <string name="restart_title">Restart Game</string>
+    <string name="restart_message">Restart the current deal? Your progress will be lost.</string>
+
+    <!-- Win Notification -->
+    <string name="win_title">Congratulations!</string>
+    <string name="win_message">You won the game!\n\nScore: %1$d\nMoves: %2$d</string>
+
+    <!-- Storage Messages -->
+    <string name="save_error">Unable to save the current game.</string>
+    <string name="load_error">Unable to load the saved game.</string>
+
+    <!-- Accessibility Descriptions -->
+    <string name="stock_description">Stock pile</string>
+    <string name="discard_description">Discard pile</string>
+    <string name="foundation_description">%1$s foundation</string>
+    <string name="tableau_description">Tableau column %1$d</string>
+    <string name="face_down_card">Face-down card</string>
+    <string name="empty_pile">Empty pile</string>
+
 </resources>

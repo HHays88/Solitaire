@@ -4,13 +4,32 @@
     <style name="Theme.Solitaire"
         parent="android:style/Theme.Material.NoActionBar">
 
-        <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#81B29A</item>
-        <item name="android:windowBackground">#123E30</item>
-        <item name="android:statusBarColor">#123E30</item>
-        <item name="android:navigationBarColor">#123E30</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <!-- Application Background -->
+        <item name="android:windowBackground">
+            @color/board_background
+        </item>
+
+        <!-- System Bars -->
+        <item name="android:statusBarColor">
+            @color/board_background
+        </item>
+
+        <item name="android:navigationBarColor">
+            @color/board_background
+        </item>
+
+        <item name="android:windowLightStatusBar">
+            false
+        </item>
+
+        <item name="android:windowLightNavigationBar">
+            false
+        </item>
+
+        <!-- Interface Styling -->
+        <item name="android:colorAccent">
+            @color/card_selected
+        </item>
 
     </style>
 

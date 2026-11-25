@@ -1,5 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+
+    <!-- Board Colors -->
+    <color name="board_background">#123E30</color>
+    <color name="empty_pile_background">#1A493A</color>
+    <color name="empty_pile_border">#73988A</color>
+
+    <!-- Card Colors -->
+    <color name="card_face">#FAFAF5</color>
+    <color name="card_border">#D0D0D0</color>
+    <color name="card_back">#334D80</color>
+    <color name="card_back_detail">#7990BA</color>
+
+    <!-- Card Suit Colors -->
+    <color name="card_black">#171717</color>
+    <color name="card_red">#B91C1C</color>
+
+    <!-- Selection Colors -->
+    <color name="card_selected">#FFD54F</color>
+
+    <!-- Interface Colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_disabled">#9CAFA7</color>
+
 </resources>
