@@ -173,6 +173,64 @@ public final class BoardLayout {
         );
     }
 
+    // HIT DETECTION
+    public HitResult hitTest(
+            float x,
+            float y,
+            GameState state) {
+        if (!isReady()) {
+            return HitResult.none();
+        }
+        if (getStockBounds().contains(x, y)) {
+            return HitResult.stock();
+        }
+        if (getDiscardBounds().contains(x, y)) {
+            return HitResult.discard();
+        }
+        for (Card.Suit suit : Card.Suit.values()) {
+            if (getFoundationBounds(suit).contains(x, y)) {
+                return HitResult.foundation(suit);
+            }
+        }
+        return hitTestTableau(x, y, state);
+    }
+
+    private HitResult hitTestTableau(
+            float x,
+            float y,
+            GameState state) {
+        for (int column = 0;
+             column < COLUMNS;
+             column++) {
+            ArrayList<Card> cards =
+                    state.getTableauColumn(column);
+            if (cards.isEmpty()) {
+                if (getEmptyTableauBounds(column)
+                        .contains(x, y)) {
+
+                    return HitResult.emptyTableau(column);
+                }
+                continue;
+            }
+            for (int cardIndex = cards.size() - 1;
+                 cardIndex >= 0;
+                 cardIndex--) {
+                RectF bounds = getTableauCardBounds(
+                        column,
+                        cardIndex,
+                        cards
+                );
+                if (bounds.contains(x, y)) {
+                    return HitResult.tableauCard(
+                            column,
+                            cardIndex
+                    );
+                }
+            }
+        }
+        return HitResult.none();
+    }
+
     // GETTERS
     public float getCardWidth() {
         return cardWidth;
@@ -185,5 +243,112 @@ public final class BoardLayout {
     public boolean isReady() {
         return cardWidth > 0f
                 && tableauTop + cardHeight <= boardBottom;
+    }
+
+    // HIT RESULTS
+    public static final class HitResult {
+
+        // HIT TYPES
+        public enum Type {
+            NONE,
+            STOCK,
+            DISCARD,
+            FOUNDATION,
+            TABLEAU_CARD,
+            EMPTY_TABLEAU
+        }
+
+        // INSTANCE VARIABLES
+        private final Type type;
+        private final Card.Suit foundationSuit;
+        private final int tableauColumn;
+        private final int cardIndex;
+
+        // CONSTRUCTOR
+        private HitResult(
+                Type type,
+                Card.Suit foundationSuit,
+                int tableauColumn,
+                int cardIndex) {
+            this.type = type;
+            this.foundationSuit = foundationSuit;
+            this.tableauColumn = tableauColumn;
+            this.cardIndex = cardIndex;
+        }
+
+        // FACTORY METHODS
+        public static HitResult none() {
+            return new HitResult(
+                    Type.NONE,
+                    null,
+                    -1,
+                    -1
+            );
+        }
+
+        public static HitResult stock() {
+            return new HitResult(
+                    Type.STOCK,
+                    null,
+                    -1,
+                    -1
+            );
+        }
+
+        public static HitResult discard() {
+            return new HitResult(
+                    Type.DISCARD,
+                    null,
+                    -1,
+                    -1
+            );
+        }
+
+        public static HitResult foundation(Card.Suit suit) {
+            return new HitResult(
+                    Type.FOUNDATION,
+                    suit,
+                    -1,
+                    -1
+            );
+        }
+
+        public static HitResult tableauCard(
+                int column,
+                int cardIndex) {
+            return new HitResult(
+                    Type.TABLEAU_CARD,
+                    null,
+                    column,
+                    cardIndex
+            );
+        }
+
+        public static HitResult emptyTableau(int column) {
+            return new HitResult(
+                    Type.EMPTY_TABLEAU,
+                    null,
+                    column,
+                    -1
+            );
+        }
+
+
+        // GETTERS
+        public Type getType() {
+            return type;
+        }
+
+        public Card.Suit getFoundationSuit() {
+            return foundationSuit;
+        }
+
+        public int getTableauColumn() {
+            return tableauColumn;
+        }
+
+        public int getCardIndex() {
+            return cardIndex;
+        }
     }
 }
