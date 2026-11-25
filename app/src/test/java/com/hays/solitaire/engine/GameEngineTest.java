@@ -735,8 +735,669 @@ public class GameEngineTest {
         assertSame(state, engine.getState());
     }
 
-    // Helper methods
+    // Scoring Tests
 
+    @Test
+    public void drawingCardIncrementsMovesWithoutChangingScore() {
+        state.setScore(25);
+        assertTrue(engine.drawCard());
+        assertEquals(25, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void multipleDrawsIncrementMovesIndividually() {
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+        assertEquals(0, state.getScore());
+        assertEquals(3, state.getMoves());
+    }
+
+    @Test
+    public void recyclingDeductsTwentyPointsAndCountsOneMove() {
+        while (!state.getStock().isEmpty()) {
+            assertTrue(engine.drawCard());
+        }
+        state.setScore(50);
+        int previousMoves = state.getMoves();
+        assertTrue(engine.recycleDiscard());
+        assertEquals(30, state.getScore());
+        assertEquals(previousMoves + 1, state.getMoves());
+    }
+
+    @Test
+    public void recyclingCannotReduceScoreBelowZero() {
+        while (!state.getStock().isEmpty()) {
+            assertTrue(engine.drawCard());
+        }
+        state.setScore(15);
+        int previousMoves = state.getMoves();
+        assertTrue(engine.recycleDiscard());
+        assertEquals(0, state.getScore());
+        assertEquals(previousMoves + 1, state.getMoves());
+    }
+
+    @Test
+    public void recyclingAtZeroStillCountsAsMove() {
+        while (!state.getStock().isEmpty()) {
+            assertTrue(engine.drawCard());
+        }
+        int previousMoves = state.getMoves();
+        assertTrue(engine.recycleDiscard());
+        assertEquals(0, state.getScore());
+        assertEquals(previousMoves + 1, state.getMoves());
+    }
+
+    @Test
+    public void repeatedRecyclesApplyPenaltyEachTime() {
+        state.setScore(100);
+        for (int cycle = 0; cycle < 3; cycle++) {
+            while (!state.getStock().isEmpty()) {
+                assertTrue(engine.drawCard());
+            }
+            assertTrue(engine.recycleDiscard());
+        }
+        assertEquals(40, state.getScore());
+        assertEquals(75, state.getMoves());
+    }
+
+    // Tableau to tableau scoring tests
+    // Tableau to tableau scoring tests
+
+    @Test
+    public void tableauTransferWithoutRevealAwardsNoPoints() {
+
+        clearPiles();
+
+        state.setScore(25);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.QUEEN)
+        );
+
+        state.getTableauColumn(1).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveTableauToTableau(
+                0, 0, 1
+        ));
+
+        assertEquals(25, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void tableauTransferWithRevealAwardsFivePoints() {
+
+        clearPiles();
+
+        Card hidden = new Card(
+                Card.Suit.DIAMONDS, Card.Rank.FIVE
+        );
+
+        state.getTableauColumn(0).add(hidden);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.QUEEN)
+        );
+
+        state.getTableauColumn(1).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveTableauToTableau(
+                0, 1, 1
+        ));
+
+        assertTrue(hidden.isFaceUp());
+        assertEquals(5, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void exposingAlreadyFaceUpCardAwardsNoRevealPoints() {
+
+        clearPiles();
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.CLUBS, Card.Rank.KING)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.QUEEN)
+        );
+
+        state.getTableauColumn(1).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveTableauToTableau(
+                0, 1, 1
+        ));
+
+        assertEquals(0, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void transferringSequenceCountsAsOneMove() {
+
+        clearPiles();
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.QUEEN)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.CLUBS, Card.Rank.JACK)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.DIAMONDS, Card.Rank.TEN)
+        );
+
+        state.getTableauColumn(1).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveTableauToTableau(
+                0, 0, 1
+        ));
+
+        assertEquals(4, state.getTableauColumn(1).size());
+        assertEquals(0, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void transferringSequenceWithRevealCountsAsOneMove() {
+
+        clearPiles();
+
+        Card hidden = new Card(
+                Card.Suit.CLUBS, Card.Rank.FIVE
+        );
+
+        state.getTableauColumn(0).add(hidden);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.QUEEN)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.CLUBS, Card.Rank.JACK)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.DIAMONDS, Card.Rank.TEN)
+        );
+
+        state.getTableauColumn(1).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveTableauToTableau(
+                0, 1, 1
+        ));
+
+        assertTrue(hidden.isFaceUp());
+        assertEquals(4, state.getTableauColumn(1).size());
+        assertEquals(5, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    // Tableau to foundation scoring tests
+    // Tableau to foundation scoring tests
+
+    @Test
+    public void tableauToFoundationAwardsTenPoints() {
+
+        clearPiles();
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        assertTrue(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertEquals(10, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void tableauToFoundationWithRevealAwardsFifteenPoints() {
+
+        clearPiles();
+
+        Card hidden = new Card(
+                Card.Suit.CLUBS, Card.Rank.JACK
+        );
+
+        state.getTableauColumn(0).add(hidden);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        assertTrue(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertTrue(hidden.isFaceUp());
+        assertEquals(15, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void tableauToFoundationWithoutNewRevealAwardsTenPoints() {
+
+        clearPiles();
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.CLUBS, Card.Rank.TWO)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        assertTrue(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertEquals(10, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    // Discard scoring tests
+    // Discard scoring tests
+
+    @Test
+    public void discardToTableauAwardsFivePoints() {
+
+        clearPiles();
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveDiscardToTableau(0));
+
+        assertEquals(5, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void discardToFoundationAwardsTenPoints() {
+
+        clearPiles();
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        assertTrue(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertEquals(10, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void exposingDiscardCardDoesNotAwardRevealPoints() {
+
+        clearPiles();
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.CLUBS, Card.Rank.FIVE)
+        );
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        assertTrue(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertEquals(1, state.getDiscard().size());
+        assertEquals(10, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    // Foundation to tableau scoring tests
+    // Foundation removal scoring tests
+
+    @Test
+    public void foundationToTableauDeductsTenPoints() {
+
+        clearPiles();
+
+        state.setScore(30);
+
+        state.getFoundation(Card.Suit.HEARTS).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.TWO)
+        );
+
+        assertTrue(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(20, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void foundationRemovalCannotReduceScoreBelowZero() {
+
+        clearPiles();
+
+        state.setScore(5);
+
+        state.getFoundation(Card.Suit.HEARTS).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.TWO)
+        );
+
+        assertTrue(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(0, state.getScore());
+        assertEquals(1, state.getMoves());
+    }
+
+    @Test
+    public void repeatedFoundationTransfersDoNotAccumulatePoints() {
+
+        clearPiles();
+
+        state.setScore(50);
+
+        state.getFoundation(Card.Suit.HEARTS).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.ACE)
+        );
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.TWO)
+        );
+
+        for (int cycle = 0; cycle < 5; cycle++) {
+
+            assertTrue(engine.moveFoundationToTableau(
+                    Card.Suit.HEARTS, 0
+            ));
+
+            assertTrue(engine.moveTableauToFoundation(
+                    0, Card.Suit.HEARTS
+            ));
+        }
+
+        assertEquals(50, state.getScore());
+        assertEquals(10, state.getMoves());
+    }
+
+    // Invalid action scoring tests
+    // Invalid action scoring tests
+
+    @Test
+    public void invalidDrawDoesNotChangeScoreOrMoves() {
+
+        clearPiles();
+
+        state.setScore(50);
+        state.setMoves(10);
+
+        assertFalse(engine.drawCard());
+
+        assertEquals(50, state.getScore());
+        assertEquals(10, state.getMoves());
+    }
+
+    @Test
+    public void invalidRecycleDoesNotChangeScoreOrMoves() {
+
+        state.setScore(50);
+        state.setMoves(10);
+
+        assertFalse(engine.recycleDiscard());
+
+        assertEquals(50, state.getScore());
+        assertEquals(10, state.getMoves());
+    }
+
+    @Test
+    public void invalidCardTransfersDoNotChangeScoreOrMoves() {
+
+        clearPiles();
+
+        state.setScore(50);
+        state.setMoves(10);
+
+        assertFalse(engine.moveTableauToTableau(
+                0, 0, 1
+        ));
+
+        assertFalse(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertFalse(engine.moveDiscardToTableau(0));
+
+        assertFalse(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertFalse(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(50, state.getScore());
+        assertEquals(10, state.getMoves());
+    }
+
+    @Test
+    public void rejectedTableauMoveDoesNotAwardRevealPoints() {
+
+        clearPiles();
+
+        state.setScore(50);
+        state.setMoves(10);
+
+        Card hidden = new Card(
+                Card.Suit.DIAMONDS, Card.Rank.FIVE
+        );
+
+        state.getTableauColumn(0).add(hidden);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.CLUBS, Card.Rank.QUEEN)
+        );
+
+        state.getTableauColumn(1).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.KING)
+        );
+
+        assertFalse(engine.moveTableauToTableau(
+                0, 1, 1
+        ));
+
+        assertFalse(hidden.isFaceUp());
+        assertEquals(50, state.getScore());
+        assertEquals(10, state.getMoves());
+    }
+
+    @Test
+    public void completedGameDoesNotAllowScoringOrMoveChanges() {
+
+        prepareNearWin();
+
+        state.getFoundation(Card.Suit.HEARTS).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.KING)
+        );
+
+        state.setGameWon(true);
+        state.setScore(600);
+        state.setMoves(150);
+
+        assertFalse(engine.drawCard());
+        assertFalse(engine.recycleDiscard());
+
+        assertFalse(engine.moveTableauToTableau(
+                0, 0, 1
+        ));
+
+        assertFalse(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertFalse(engine.moveDiscardToTableau(0));
+
+        assertFalse(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertFalse(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(600, state.getScore());
+        assertEquals(150, state.getMoves());
+        assertTrue(state.isGameWon());
+    }
+
+    // Winning move scoring tests
+    // Winning move scoring tests
+
+    @Test
+    public void finalTableauMoveUpdatesScoreAndMoveCount() {
+
+        prepareNearWin();
+
+        state.setScore(590);
+        state.setMoves(149);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertTrue(state.isGameWon());
+        assertEquals(600, state.getScore());
+        assertEquals(150, state.getMoves());
+    }
+
+    @Test
+    public void finalDiscardMoveUpdatesScoreAndMoveCount() {
+
+        prepareNearWin();
+
+        state.setScore(590);
+        state.setMoves(149);
+
+        state.getDiscard().add(
+                faceUpCard(Card.Suit.HEARTS, Card.Rank.KING)
+        );
+
+        assertTrue(engine.moveDiscardToFoundation(
+                Card.Suit.HEARTS
+        ));
+
+        assertTrue(state.isGameWon());
+        assertEquals(600, state.getScore());
+        assertEquals(150, state.getMoves());
+    }
+
+    // Combined gameplay scoring tests
+    // Combined gameplay scoring tests
+
+    @Test
+    public void differentGameplayActionsAccumulateScoreAndMoves() {
+
+        clearPiles();
+
+        Card ace = new Card(
+                Card.Suit.HEARTS, Card.Rank.ACE
+        );
+
+        state.getStock().add(ace);
+
+        state.getTableauColumn(0).add(
+                faceUpCard(Card.Suit.SPADES, Card.Rank.TWO)
+        );
+
+        // Draw: 0 points, +1 move
+
+        assertTrue(engine.drawCard());
+
+        assertEquals(0, state.getScore());
+        assertEquals(1, state.getMoves());
+
+        // Discard to tableau: +5 points, +1 move
+
+        assertTrue(engine.moveDiscardToTableau(0));
+
+        assertEquals(5, state.getScore());
+        assertEquals(2, state.getMoves());
+
+        // Tableau to foundation: +10 points, +1 move
+
+        assertTrue(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertEquals(15, state.getScore());
+        assertEquals(3, state.getMoves());
+
+        // Foundation to tableau: -10 points, +1 move
+
+        assertTrue(engine.moveFoundationToTableau(
+                Card.Suit.HEARTS, 0
+        ));
+
+        assertEquals(5, state.getScore());
+        assertEquals(4, state.getMoves());
+
+        // Tableau to foundation: +10 points, +1 move
+
+        assertTrue(engine.moveTableauToFoundation(
+                0, Card.Suit.HEARTS
+        ));
+
+        assertEquals(15, state.getScore());
+        assertEquals(5, state.getMoves());
+    }
+
+    @Test
+    public void normalGameplayDoesNotConsumeUndosOrChangeTime() {
+
+        state.setRemainingUndos(2);
+        state.setElapsedTimeMs(5000);
+
+        assertTrue(engine.drawCard());
+        assertTrue(engine.drawCard());
+
+        assertEquals(2, state.getRemainingUndos());
+        assertEquals(5000L, state.getElapsedTimeMs());
+        assertEquals(2, state.getMoves());
+    }
+
+    // Helper methods
     private Card faceUpCard(
             Card.Suit suit,
             Card.Rank rank) {

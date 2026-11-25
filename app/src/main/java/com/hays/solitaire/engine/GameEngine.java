@@ -32,6 +32,8 @@ public final class GameEngine {
         Card card = removeTopCard(state.getStock());
         card.setFaceUp(true);
         state.getDiscard().add(card);
+        // increment move count
+        ScoreManager.incrementMoves(state);
         return true;
     }
 
@@ -51,6 +53,12 @@ public final class GameEngine {
             card.setFaceUp(false);
             stock.add(card);
         }
+        // apply recycle penalty and increment move count
+        ScoreManager.adjustScore(
+                state,
+                ScoreManager.RECYCLE_PENALTY
+        );
+        ScoreManager.incrementMoves(state);
         return true;
     }
 
@@ -80,7 +88,14 @@ public final class GameEngine {
                 source.subList(startIndex, source.size())
         );
         source.subList(startIndex, source.size()).clear();
-        revealTopCard(source);
+        // Adjust score and increment move count
+        if (revealTopCard(source)) {
+            ScoreManager.adjustScore(
+                    state,
+                    ScoreManager.REVEAL_POINTS
+            );
+        }
+        ScoreManager.incrementMoves(state);
         return true;
     }
 
@@ -99,7 +114,18 @@ public final class GameEngine {
                 state.getTableauColumn(sourceColumn);
         Card card = removeTopCard(source);
         state.getFoundation(suit).add(card);
-        revealTopCard(source);
+        // Adjust score and increment move count
+        ScoreManager.adjustScore(
+                state,
+                ScoreManager.FOUNDATION_POINTS
+        );
+        if (revealTopCard(source)) {
+            ScoreManager.adjustScore(
+                    state,
+                    ScoreManager.REVEAL_POINTS
+            );
+        }
+        ScoreManager.incrementMoves(state);
         checkForWin();
         return true;
     }
@@ -115,6 +141,12 @@ public final class GameEngine {
         }
         Card card = removeTopCard(state.getDiscard());
         state.getTableauColumn(destinationColumn).add(card);
+        // adjust score and increment move count
+        ScoreManager.adjustScore(
+                state,
+                ScoreManager.DISCARD_TO_TABLEAU_POINTS
+        );
+        ScoreManager.incrementMoves(state);
         return true;
     }
 
@@ -129,6 +161,12 @@ public final class GameEngine {
         }
         Card card = removeTopCard(state.getDiscard());
         state.getFoundation(suit).add(card);
+        // adjust score and increment move count
+        ScoreManager.adjustScore(
+                state,
+                ScoreManager.FOUNDATION_POINTS
+        );
+        ScoreManager.incrementMoves(state);
         checkForWin();
         return true;
     }
@@ -148,6 +186,12 @@ public final class GameEngine {
                 state.getFoundation(suit)
         );
         state.getTableauColumn(destinationColumn).add(card);
+        // adjust score and increment move count
+        ScoreManager.adjustScore(
+                state,
+                ScoreManager.FOUNDATION_REMOVAL_PENALTY
+        );
+        ScoreManager.incrementMoves(state);
         return true;
     }
 
